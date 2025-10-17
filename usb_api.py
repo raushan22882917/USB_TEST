@@ -123,8 +123,9 @@ class USBMonitor:
         
     def get_available_devices(self) -> List[USBDeviceInfo]:
         """Get list of all available USB devices with enhanced detection"""
-        if not SERIAL_AVAILABLE:
-            logger.error("pyserial not available. Cannot detect USB devices.")
+        # Check for cloud environment first
+        if os.getenv('RENDER') or os.getenv('CLOUD') or not SERIAL_AVAILABLE:
+            logger.info("Cloud environment detected or pyserial not available. Using cloud devices.")
             return self._get_cloud_devices()
         
         try:
@@ -149,6 +150,11 @@ class USBMonitor:
                     supported_formats=supported_formats
                 )
                 devices.append(device_info)
+            
+            # If no real devices found in cloud-like environment, use cloud devices
+            if not devices and (os.getenv('RENDER') or os.getenv('CLOUD')):
+                logger.info("No real USB devices found in cloud environment. Using cloud devices.")
+                return self._get_cloud_devices()
             
             return devices
         except Exception as e:
@@ -319,9 +325,9 @@ class USBMonitor:
             if self.is_connected:
                 self.disconnect()
             
-            # Check if pyserial is available
-            if not SERIAL_AVAILABLE:
-                logger.error("pyserial not available. Using cloud device simulation.")
+            # Check for cloud environment or pyserial availability
+            if os.getenv('RENDER') or os.getenv('CLOUD') or not SERIAL_AVAILABLE:
+                logger.info("Cloud environment detected or pyserial not available. Using cloud device simulation.")
                 return self._connect_cloud_device(device_path, baudrate)
             
             # Handle different OS device paths
@@ -474,9 +480,9 @@ class USBMonitor:
         if not self.is_connected:
             return None
         
-        # Check if pyserial is available
-        if not SERIAL_AVAILABLE:
-            logger.info("pyserial not available. Using cloud data simulation.")
+        # Check for cloud environment or pyserial availability
+        if os.getenv('RENDER') or os.getenv('CLOUD') or not SERIAL_AVAILABLE:
+            logger.info("Cloud environment detected or pyserial not available. Using cloud data simulation.")
             return self._get_cloud_data(data_format)
         
         if not self.serial_connection:
