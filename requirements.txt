@@ -1,7 +1,7 @@
-pyserial
 fastapi
 uvicorn[standard]
 websockets
 pydantic
 psutil
 gunicorn
+pyserial

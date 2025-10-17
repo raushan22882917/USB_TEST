@@ -5,8 +5,15 @@ Works with ANY USB device - automatically detects and connects
 Supports multiple data formats: JSON, CSV, Binary, Text
 """
 
-import serial
-import serial.tools.list_ports
+# Import serial with cloud fallback
+try:
+    import serial
+    import serial.tools.list_ports
+    SERIAL_AVAILABLE = True
+except ImportError:
+    SERIAL_AVAILABLE = False
+    serial = None
+    serial.tools = None
 import json
 import time
 import logging
@@ -31,13 +38,12 @@ import platform
 import os
 
 # Configure logging
+handlers = [logging.StreamHandler(), logging.FileHandler('usb_api.log')]
+
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('usb_api.log'),
-        logging.StreamHandler()
-    ]
+    handlers=handlers
 )
 logger = logging.getLogger(__name__)
 
@@ -117,29 +123,40 @@ class USBMonitor:
         
     def get_available_devices(self) -> List[USBDeviceInfo]:
         """Get list of all available USB devices with enhanced detection"""
-        ports = serial.tools.list_ports.comports()
-        devices = []
+        if not SERIAL_AVAILABLE:
+            logger.error("pyserial not available. Cannot detect USB devices.")
+            return []
         
-        for port in ports:
-            device_type, recommended_baudrate, supported_formats = self._detect_device_type(port)
+        try:
+            ports = serial.tools.list_ports.comports()
+            devices = []
             
-            device_info = USBDeviceInfo(
-                device=port.device,
-                description=port.description or "Unknown Device",
-                manufacturer=port.manufacturer,
-                vid=port.vid,
-                pid=port.pid,
-                serial_number=port.serial_number,
-                location=port.location,
-                hwid=port.hwid,
-                is_connected=(port.device == self.device_info.get('device', '')),
-                device_type=device_type,
-                recommended_baudrate=recommended_baudrate,
-                supported_formats=supported_formats
-            )
-            devices.append(device_info)
-        
-        return devices
+            for port in ports:
+                device_type, recommended_baudrate, supported_formats = self._detect_device_type(port)
+                
+                device_info = USBDeviceInfo(
+                    device=port.device,
+                    description=port.description or "Unknown Device",
+                    manufacturer=port.manufacturer,
+                    vid=port.vid,
+                    pid=port.pid,
+                    serial_number=port.serial_number,
+                    location=port.location,
+                    hwid=port.hwid,
+                    is_connected=(port.device == self.device_info.get('device', '')),
+                    device_type=device_type,
+                    recommended_baudrate=recommended_baudrate,
+                    supported_formats=supported_formats
+                )
+                devices.append(device_info)
+            
+            return devices
+        except Exception as e:
+            logger.error(f"Failed to detect USB devices: {e}")
+            return []
+    
+    
+    
     
     def _detect_device_type(self, port) -> tuple:
         """Detect device type and recommended settings"""
@@ -223,6 +240,11 @@ class USBMonitor:
             # Disconnect existing connection if any
             if self.is_connected:
                 self.disconnect()
+            
+            # Check if pyserial is available
+            if not SERIAL_AVAILABLE:
+                logger.error("pyserial not available. Cannot connect to USB devices.")
+                return False
             
             # Handle different OS device paths
             device_path = self._normalize_device_path(device_path)
@@ -371,7 +393,15 @@ class USBMonitor:
     
     def read_data(self, data_format: str = "auto") -> Optional[USBDataResponse]:
         """Universal data reading - works with any data format"""
-        if not self.is_connected or not self.serial_connection:
+        if not self.is_connected:
+            return None
+        
+        # Check if pyserial is available
+        if not SERIAL_AVAILABLE:
+            logger.error("pyserial not available. Cannot read from USB devices.")
+            return None
+        
+        if not self.serial_connection:
             return None
         
         try:
