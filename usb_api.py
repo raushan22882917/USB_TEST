@@ -5,7 +5,7 @@ Works with ANY USB device - automatically detects and connects
 Supports multiple data formats: JSON, CSV, Binary, Text
 """
 
-# Import serial with cloud fallback
+# Import serial for USB device communication
 try:
     import serial
     import serial.tools.list_ports
@@ -123,10 +123,9 @@ class USBMonitor:
         
     def get_available_devices(self) -> List[USBDeviceInfo]:
         """Get list of all available USB devices with enhanced detection"""
-        # Check for cloud environment first
-        if os.getenv('RENDER') or os.getenv('CLOUD') or not SERIAL_AVAILABLE:
-            logger.info("Cloud environment detected or pyserial not available. Using cloud devices.")
-            return self._get_cloud_devices()
+        if not SERIAL_AVAILABLE:
+            logger.error("pyserial not available. Cannot detect USB devices.")
+            return []
         
         try:
             ports = serial.tools.list_ports.comports()
@@ -151,102 +150,13 @@ class USBMonitor:
                 )
                 devices.append(device_info)
             
-            # If no real devices found in cloud-like environment, use cloud devices
-            if not devices and (os.getenv('RENDER') or os.getenv('CLOUD')):
-                logger.info("No real USB devices found in cloud environment. Using cloud devices.")
-                return self._get_cloud_devices()
-            
             return devices
         except Exception as e:
             logger.error(f"Failed to detect USB devices: {e}")
-            return self._get_cloud_devices()
+            return []
     
-    def _get_cloud_devices(self) -> List[USBDeviceInfo]:
-        """Get cloud devices for environments without real USB access"""
-        cloud_devices = [
-            USBDeviceInfo(
-                device="/dev/cloud/cp2102",
-                description="CP2102 USB to UART Bridge Controller",
-                manufacturer="Silicon Labs",
-                vid=0x10C4,
-                pid=0xEA60,
-                serial_number="CLOUD001",
-                location="cloud-1",
-                hwid="CLOUD VID:PID=10C4:EA60",
-                is_connected=False,
-                device_type="generic",
-                recommended_baudrate=115200,
-                supported_formats=["json", "text", "csv", "binary"]
-            ),
-            USBDeviceInfo(
-                device="/dev/cloud/sensor",
-                description="Temperature Sensor",
-                manufacturer="Cloud Labs",
-                vid=0x1234,
-                pid=0x5678,
-                serial_number="CLOUD002",
-                location="cloud-2",
-                hwid="CLOUD VID:PID=1234:5678",
-                is_connected=False,
-                device_type="sensor",
-                recommended_baudrate=9600,
-                supported_formats=["json", "text"]
-            )
-        ]
-        return cloud_devices
     
-    def _connect_cloud_device(self, device_path: str, baudrate: int = None) -> bool:
-        """Connect to cloud device simulation"""
-        logger.info(f"🔌 Connecting to cloud device: {device_path}")
-        
-        # Simulate connection delay
-        time.sleep(0.5)
-        
-        # Set cloud connection
-        self.is_connected = True
-        self.device_info = {
-            "device": device_path,
-            "description": "Cloud Device Simulation",
-            "baudrate": baudrate or 115200,
-            "timestamp": datetime.now().isoformat(),
-            "environment": "cloud"
-        }
-        
-        logger.info(f"✅ Successfully connected to cloud device: {device_path}")
-        return True
     
-    def _get_cloud_data(self, data_format: str = "auto") -> USBDataResponse:
-        """Generate cloud sensor data"""
-        import random
-        
-        cloud_data = {
-            "timestamp": datetime.now().isoformat(),
-            "temperature": round(random.uniform(20.0, 35.0), 2),
-            "humidity": round(random.uniform(40.0, 80.0), 2),
-            "pressure": round(random.uniform(980.0, 1020.0), 2),
-            "battery_voltage": round(random.uniform(3.2, 4.2), 2),
-            "signal_strength": random.randint(-80, -30),
-            "device_id": "CLOUD_DEVICE_001",
-            "status": "active",
-            "soc": round(random.uniform(80.0, 95.0), 1),
-            "battery_i": round(random.uniform(10.0, 15.0), 1),
-            "rpm": random.randint(1400, 1600)
-        }
-        
-        return USBDataResponse(
-            timestamp=cloud_data["timestamp"],
-            data_size=len(json.dumps(cloud_data)),
-            raw_data=json.dumps(cloud_data),
-            formatted_data=cloud_data,
-            data_type="json",
-            device_info=self.device_info,
-            sensor_data=cloud_data,
-            temp=cloud_data["temperature"],
-            battery_v=cloud_data["battery_voltage"],
-            soc=cloud_data["soc"],
-            battery_i=cloud_data["battery_i"],
-            rpm=cloud_data["rpm"]
-        )
     
     def _detect_device_type(self, port) -> tuple:
         """Detect device type and recommended settings"""
@@ -331,10 +241,10 @@ class USBMonitor:
             if self.is_connected:
                 self.disconnect()
             
-            # Check for cloud environment or pyserial availability
-            if os.getenv('RENDER') or os.getenv('CLOUD') or not SERIAL_AVAILABLE:
-                logger.info("Cloud environment detected or pyserial not available. Using cloud device simulation.")
-                return self._connect_cloud_device(device_path, baudrate)
+            # Check for pyserial availability
+            if not SERIAL_AVAILABLE:
+                logger.error("pyserial not available. Cannot connect to USB devices.")
+                return False
             
             # Handle different OS device paths
             device_path = self._normalize_device_path(device_path)
@@ -486,10 +396,10 @@ class USBMonitor:
         if not self.is_connected:
             return None
         
-        # Check for cloud environment or pyserial availability
-        if os.getenv('RENDER') or os.getenv('CLOUD') or not SERIAL_AVAILABLE:
-            logger.info("Cloud environment detected or pyserial not available. Using cloud data simulation.")
-            return self._get_cloud_data(data_format)
+        # Check for pyserial availability
+        if not SERIAL_AVAILABLE:
+            logger.error("pyserial not available. Cannot read from USB devices.")
+            return None
         
         if not self.serial_connection:
             return None
