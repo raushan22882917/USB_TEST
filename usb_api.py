@@ -227,7 +227,10 @@ class USBMonitor:
             "battery_voltage": round(random.uniform(3.2, 4.2), 2),
             "signal_strength": random.randint(-80, -30),
             "device_id": "CLOUD_DEVICE_001",
-            "status": "active"
+            "status": "active",
+            "soc": round(random.uniform(80.0, 95.0), 1),
+            "battery_i": round(random.uniform(10.0, 15.0), 1),
+            "rpm": random.randint(1400, 1600)
         }
         
         return USBDataResponse(
@@ -239,7 +242,10 @@ class USBMonitor:
             device_info=self.device_info,
             sensor_data=cloud_data,
             temp=cloud_data["temperature"],
-            battery_v=cloud_data["battery_voltage"]
+            battery_v=cloud_data["battery_voltage"],
+            soc=cloud_data["soc"],
+            battery_i=cloud_data["battery_i"],
+            rpm=cloud_data["rpm"]
         )
     
     def _detect_device_type(self, port) -> tuple:
